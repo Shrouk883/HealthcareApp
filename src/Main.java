@@ -45,8 +45,8 @@ public class Main {
         );
 
         AppointmentOperations.selectAppointments();
-        AppointmentOperations.updateAppointmentDoctor(1002, 1);
-        AppointmentOperations.deleteAppointment(1002);
+        AppointmentOperations.updateAppointmentDoctor(10002, 1);
+        AppointmentOperations.deleteAppointment(10002);
         MedicationOperations.selectMedications();
 
 
