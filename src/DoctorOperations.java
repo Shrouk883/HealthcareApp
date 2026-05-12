@@ -179,4 +179,35 @@ public class DoctorOperations {
             System.err.println("Search failed: " + e.getMessage());
         }
     }
+     // SEARCH BY BRANCH LOCATION
+    public static void searchByBranchLocation(String location) {
+
+        String sql =
+                "SELECT D.DOCTOR_ID, D.NAME, D.EXPERTISE, B._ADDRESS FROM DOCTOR D " +
+                        "JOIN BRANCH B ON D.BRANCH_ID_ = B.BRANCH_ID_ " +
+                        "WHERE B._ADDRESS LIKE ?";
+
+        try (Connection con = DBConnection.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setString(1, "%" + location + "%");
+
+            ResultSet rs = ps.executeQuery();
+
+            System.out.println("\n===== DOCTORS BY BRANCH LOCATION =====");
+
+            while (rs.next()) {
+
+                System.out.println(
+                        rs.getInt("DOCTOR_ID") + " | " +
+                                rs.getString("NAME") + " | " +
+                                rs.getString("EXPERTISE") + " | " +
+                                rs.getString("_ADDRESS")
+                );
+            }
+
+        } catch (SQLException e) {
+            System.err.println("Search by branch location failed: " + e.getMessage());
+        }
+    }
 }
