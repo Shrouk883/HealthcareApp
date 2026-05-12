@@ -4,7 +4,6 @@ public class AppointmentOperations {
 
     //INSERT
     public static boolean insertAppointment(int appointmentId,
-                                            int diagnosisId,
                                             int doctorId,
                                             int patientId,
                                             String date,
@@ -12,17 +11,16 @@ public class AppointmentOperations {
 
         String sql = "INSERT INTO APPOINTMENT " +
                 "(APPOINTMENT_ID, DIAGNOSIS_ID, DOCTOR_ID, PATIENT_ID_, DATE, TIME) " +
-                "VALUES (?, ?, ?, ?, ?, ?)";
+                "VALUES (?, NULL, ?, ?, ?, ?)";
 
         try (Connection con = DBConnection.getConnection();
              PreparedStatement ps = con.prepareStatement(sql)) {
 
             ps.setInt(1, appointmentId);
-            ps.setInt(2, diagnosisId);
-            ps.setInt(3, doctorId);
-            ps.setInt(4, patientId);
-            ps.setString(5, date);
-            ps.setString(6, time);
+            ps.setInt(2, doctorId);
+            ps.setInt(3, patientId);
+            ps.setString(4, date);
+            ps.setString(5, time);
 
             ps.executeUpdate();
             System.out.println("Appointment inserted successfully");
