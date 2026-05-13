@@ -37,11 +37,11 @@ public class Main {
         System.out.println("\n=== APPOINTMENTS ===");
 
         AppointmentOperations.insertAppointment(
-                10001, 1, 1, 101, "2026-05-11", "09:00"
+                10001, 1, 1, "2026-05-11", "09:00"
         );
 
         AppointmentOperations.insertAppointment(
-                10002, 2, 2, 102, "2026-05-12", "10:30"
+                10002, 2, 2, "2026-05-12", "10:30"
         );
 
         AppointmentOperations.selectAppointments();
