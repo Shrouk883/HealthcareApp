@@ -18,18 +18,20 @@ public class AppointmentGUI {
 
         TextField txtAppointmentId = new TextField();
         txtAppointmentId.setPromptText("Appointment ID");
-        TextField txtDiagnosisId = new TextField();
-        txtDiagnosisId.setPromptText("Diagnosis ID");
+
         TextField txtDoctorId = new TextField();
         txtDoctorId.setPromptText("Doctor ID");
+
         TextField txtPatientId = new TextField();
         txtPatientId.setPromptText("Patient ID");
+
         DatePicker datePicker = new DatePicker();
+
         TextField txtTime = new TextField();
         txtTime.setPromptText("Time (HH:MM)");
 
         Button btnInsert = new Button("Add Appointment");
-        Button btnUpdate = new Button("Update Doctor");
+        Button btnUpdate = new Button("Update");
         Button btnDelete = new Button("Delete");
         Button btnRefresh = new Button("Refresh");
 
@@ -43,30 +45,90 @@ public class AppointmentGUI {
 
         setupTable();
 
+        tableView.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, selectedRow) -> {
+            if (selectedRow != null) {
+                txtAppointmentId.setText(selectedRow.get(0));
+                txtDoctorId.setText(selectedRow.get(2));
+                txtPatientId.setText(selectedRow.get(3));
+
+                try {
+                    datePicker.setValue(java.time.LocalDate.parse(selectedRow.get(4)));
+                } catch (Exception ex) {
+                    datePicker.setValue(null);
+                }
+
+                String timeValue = selectedRow.get(5);
+                if (timeValue != null && timeValue.length() >= 5) {
+                    txtTime.setText(timeValue.substring(0, 5));
+                } else {
+                    txtTime.setText(timeValue);
+                }
+            }
+        });
+
         btnInsert.setOnAction(e -> {
             try {
                 int id = Integer.parseInt(txtAppointmentId.getText());
-                int diagnosisId = Integer.parseInt(txtDiagnosisId.getText());
                 int doctorId = Integer.parseInt(txtDoctorId.getText());
                 int patientId = Integer.parseInt(txtPatientId.getText());
                 String date = datePicker.getValue().toString();
                 String time = txtTime.getText();
 
-                String sql = "INSERT INTO APPOINTMENT (APPOINTMENT_ID, DIAGNOSIS_ID, DOCTOR_ID, PATIENT_ID_, DATE, TIME) VALUES (?, ?, ?, ?, ?, ?)";
+                String sql = "INSERT INTO APPOINTMENT (APPOINTMENT_ID, DOCTOR_ID, PATIENT_ID_, DATE, TIME) VALUES (?, ?, ?, ?, ?)";
+
                 try (Connection con = DBConnection.getConnection();
                      PreparedStatement ps = con.prepareStatement(sql)) {
+
                     ps.setInt(1, id);
-                    ps.setInt(2, diagnosisId);
-                    ps.setInt(3, doctorId);
-                    ps.setInt(4, patientId);
-                    ps.setString(5, date);
-                    ps.setString(6, time + ":00");
+                    ps.setInt(2, doctorId);
+                    ps.setInt(3, patientId);
+                    ps.setString(4, date);
+                    ps.setString(5, time + ":00");
+
                     ps.executeUpdate();
+
                     logArea.appendText("✓ Appointment " + id + " added!\n");
                     refreshTable();
-                    clearFields(txtAppointmentId, txtDiagnosisId, txtDoctorId, txtPatientId, txtTime);
+                    clearFields(txtAppointmentId, txtDoctorId, txtPatientId, txtTime);
                     datePicker.setValue(null);
                 }
+
+            } catch (SQLException ex) {
+                logArea.appendText("✗ Error: " + ex.getMessage() + "\n");
+            } catch (Exception ex) {
+                logArea.appendText("✗ Invalid input: " + ex.getMessage() + "\n");
+            }
+        });
+
+        btnUpdate.setOnAction(e -> {
+            try {
+                int appointmentId = Integer.parseInt(txtAppointmentId.getText());
+                int doctorId = Integer.parseInt(txtDoctorId.getText());
+                String date = datePicker.getValue().toString();
+                String time = txtTime.getText();
+
+                String sql = "UPDATE APPOINTMENT SET DOCTOR_ID = ?, DATE = ?, TIME = ? WHERE APPOINTMENT_ID = ?";
+
+                try (Connection con = DBConnection.getConnection();
+                     PreparedStatement ps = con.prepareStatement(sql)) {
+
+                    ps.setInt(1, doctorId);
+                    ps.setString(2, date);
+                    ps.setString(3, time + ":00");
+                    ps.setInt(4, appointmentId);
+
+                    int rows = ps.executeUpdate();
+
+                    if (rows > 0) {
+                        logArea.appendText("✓ Appointment " + appointmentId + " updated!\n");
+                        refreshTable();
+                        clearFields(txtAppointmentId, txtDoctorId, txtPatientId, txtTime);
+                        datePicker.setValue(null);
+                    } else {
+                        logArea.appendText("✗ No appointment found with ID " + appointmentId + "\n");
+                    }
+                }
+
             } catch (SQLException ex) {
                 logArea.appendText("✗ Error: " + ex.getMessage() + "\n");
             } catch (Exception ex) {
@@ -79,37 +141,49 @@ public class AppointmentGUI {
             if (selected != null) {
                 try {
                     String sql = "DELETE FROM APPOINTMENT WHERE APPOINTMENT_ID = ?";
+
                     try (Connection con = DBConnection.getConnection();
                          PreparedStatement ps = con.prepareStatement(sql)) {
+
                         ps.setInt(1, Integer.parseInt(selected));
                         ps.executeUpdate();
+
                         logArea.appendText("✓ Appointment " + selected + " deleted!\n");
                         refreshTable();
                     }
+
                 } catch (SQLException ex) {
                     logArea.appendText("✗ Error: " + ex.getMessage() + "\n");
                 }
             }
         });
 
-        btnRefresh.setOnAction(e -> refreshTable());
+        btnRefresh.setOnAction(e -> {
+            refreshTable();
+            clearFields(txtAppointmentId, txtDoctorId, txtPatientId, txtTime);
+            datePicker.setValue(null);
+            tableView.getSelectionModel().clearSelection();
+        });
 
         GridPane inputGrid = new GridPane();
         inputGrid.setPadding(new Insets(10));
         inputGrid.setVgap(10);
         inputGrid.setHgap(10);
+
         inputGrid.add(new Label("Appointment ID:"), 0, 0);
         inputGrid.add(txtAppointmentId, 1, 0);
-        inputGrid.add(new Label("Diagnosis ID:"), 0, 1);
-        inputGrid.add(txtDiagnosisId, 1, 1);
-        inputGrid.add(new Label("Doctor ID:"), 0, 2);
-        inputGrid.add(txtDoctorId, 1, 2);
-        inputGrid.add(new Label("Patient ID:"), 0, 3);
-        inputGrid.add(txtPatientId, 1, 3);
-        inputGrid.add(new Label("Date:"), 0, 4);
-        inputGrid.add(datePicker, 1, 4);
-        inputGrid.add(new Label("Time:"), 0, 5);
-        inputGrid.add(txtTime, 1, 5);
+
+        inputGrid.add(new Label("Doctor ID:"), 0, 1);
+        inputGrid.add(txtDoctorId, 1, 1);
+
+        inputGrid.add(new Label("Patient ID:"), 0, 2);
+        inputGrid.add(txtPatientId, 1, 2);
+
+        inputGrid.add(new Label("Date:"), 0, 3);
+        inputGrid.add(datePicker, 1, 3);
+
+        inputGrid.add(new Label("Time:"), 0, 4);
+        inputGrid.add(txtTime, 1, 4);
 
         HBox buttonBox = new HBox(10, btnInsert, btnUpdate, btnDelete, btnRefresh);
 
@@ -118,8 +192,10 @@ public class AppointmentGUI {
         mainLayout.getChildren().addAll(
                 new Label("APPOINTMENT MANAGEMENT"),
                 inputGrid, buttonBox,
-                new Label("Appointment List:"), tableView,
-                new Label("Log:"), logArea
+                new Label("Appointment List:"),
+                tableView,
+                new Label("Log:"),
+                logArea
         );
 
         Scene scene = new Scene(mainLayout, 900, 700);
@@ -150,6 +226,7 @@ public class AppointmentGUI {
 
     private void refreshTable() {
         tableView.getItems().clear();
+
         String sql = "SELECT APPOINTMENT_ID, DIAGNOSIS_ID, DOCTOR_ID, PATIENT_ID_, CONVERT(DATE, DATE) AS DATE, TIME FROM APPOINTMENT ORDER BY APPOINTMENT_ID";
 
         try (Connection con = DBConnection.getConnection();
@@ -158,14 +235,24 @@ public class AppointmentGUI {
 
             while (rs.next()) {
                 ObservableList<String> row = FXCollections.observableArrayList();
+
                 row.add(String.valueOf(rs.getInt("APPOINTMENT_ID")));
-                row.add(String.valueOf(rs.getInt("DIAGNOSIS_ID")));
+
+                int diagnosisId = rs.getInt("DIAGNOSIS_ID");
+                if (rs.wasNull()) {
+                    row.add("");
+                } else {
+                    row.add(String.valueOf(diagnosisId));
+                }
+
                 row.add(String.valueOf(rs.getInt("DOCTOR_ID")));
                 row.add(String.valueOf(rs.getInt("PATIENT_ID_")));
                 row.add(rs.getString("DATE"));
                 row.add(rs.getString("TIME"));
+
                 tableView.getItems().add(row);
             }
+
             logArea.appendText("✓ Loaded " + tableView.getItems().size() + " appointments\n");
 
         } catch (SQLException e) {
