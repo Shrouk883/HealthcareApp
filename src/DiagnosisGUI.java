@@ -63,11 +63,12 @@ public class DiagnosisGUI {
         txtDuration.setPromptText("Duration (days)");
 
         Button btnAddTreatment = new Button("Add Treatment Plan");
+        Button btnUpdateTreatment = new Button("Update Treatment Plan");
         Button btnRefreshTreatment = new Button("Refresh Treatment Plans");
         Button btnDeleteTreatment = new Button("Delete Selected Treatment");
         btnDeleteTreatment.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white;");
 
-        HBox treatmentButtonBox = new HBox(10, btnAddTreatment, btnRefreshTreatment, btnDeleteTreatment);
+        HBox treatmentButtonBox = new HBox(10, btnAddTreatment, btnUpdateTreatment, btnRefreshTreatment, btnDeleteTreatment);
 
         treatmentBox.getChildren().addAll(
                 new Label("Diagnosis ID:"), txtTreatDiagnosisId,
@@ -89,30 +90,91 @@ public class DiagnosisGUI {
         setupDiagnosisTable();
         setupTreatmentTable();
 
+        diagnosisTable.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, selectedRow) -> {
+            if (selectedRow != null) {
+                txtDiagnosisId.setText(selectedRow.get(0));
+                txtAppointmentId.setText(selectedRow.get(1));
+                txtDescription.setText(selectedRow.get(2));
+            }
+        });
+
+        treatmentTable.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, selectedRow) -> {
+            if (selectedRow != null) {
+                txtTreatDiagnosisId.setText(selectedRow.get(0));
+                txtMedicationId.setText(selectedRow.get(1));
+                txtDosage.setText(selectedRow.get(2));
+                txtDuration.setText(selectedRow.get(3));
+            }
+        });
+
         // Button actions
         btnAddDiagnosis.setOnAction(e -> {
+            Connection con = null;
+
             try {
                 int id = Integer.parseInt(txtDiagnosisId.getText());
                 int apptId = Integer.parseInt(txtAppointmentId.getText());
                 String desc = txtDescription.getText();
 
-                String sql = "INSERT INTO DIAGNOSIS (DIAGNOSIS_ID, APPOINTMENT_ID, DESCRIPTION) VALUES (?, ?, ?)";
-                try (Connection con = DBConnection.getConnection();
-                     PreparedStatement ps = con.prepareStatement(sql)) {
+                con = DBConnection.getConnection();
+                con.setAutoCommit(false);
+
+                String insertDiagnosisSql = "INSERT INTO DIAGNOSIS (DIAGNOSIS_ID, APPOINTMENT_ID, DESCRIPTION) VALUES (?, ?, ?)";
+                try (PreparedStatement ps = con.prepareStatement(insertDiagnosisSql)) {
                     ps.setInt(1, id);
                     ps.setInt(2, apptId);
                     ps.setString(3, desc);
                     ps.executeUpdate();
-                    logArea.appendText("✓ Diagnosis " + id + " added!\n");
-                    refreshDiagnosisTable();
-                    txtDiagnosisId.clear();
-                    txtAppointmentId.clear();
-                    txtDescription.clear();
                 }
+
+                String updateAppointmentSql = "UPDATE APPOINTMENT SET DIAGNOSIS_ID = ? WHERE APPOINTMENT_ID = ?";
+                try (PreparedStatement ps = con.prepareStatement(updateAppointmentSql)) {
+                    ps.setInt(1, id);
+                    ps.setInt(2, apptId);
+
+                    int rows = ps.executeUpdate();
+
+                    if (rows == 0) {
+                        con.rollback();
+                        logArea.appendText("✗ No appointment found with ID " + apptId + "\n");
+                        return;
+                    }
+                }
+
+                con.commit();
+
+                logArea.appendText("✓ Diagnosis " + id + " added and linked to appointment " + apptId + "!\n");
+                refreshDiagnosisTable();
+                clearDiagnosisFields(txtDiagnosisId, txtAppointmentId, txtDescription);
+                diagnosisTable.getSelectionModel().clearSelection();
+
             } catch (SQLException ex) {
+                try {
+                    if (con != null) con.rollback();
+                } catch (SQLException rollbackEx) {
+                    logArea.appendText("✗ Rollback Error: " + rollbackEx.getMessage() + "\n");
+                }
+
                 logArea.appendText("✗ Error: " + ex.getMessage() + "\n");
+
             } catch (Exception ex) {
+                try {
+                    if (con != null) con.rollback();
+                } catch (SQLException rollbackEx) {
+                    logArea.appendText("✗ Rollback Error: " + rollbackEx.getMessage() + "\n");
+                }
+
                 logArea.appendText("✗ Invalid input\n");
+
+            } finally {
+                try {
+                    if (con != null) {
+                        con.setAutoCommit(true);
+                        con.close();
+                    }
+                } catch (SQLException closeEx) {
+                    logArea.appendText("✗ Close Error: " + closeEx.getMessage() + "\n");
+                }
             }
         });
 
@@ -127,6 +189,7 @@ public class DiagnosisGUI {
                         ps.executeUpdate();
                         logArea.appendText("✓ Diagnosis " + id + " deleted!\n");
                         refreshDiagnosisTable();
+                        clearDiagnosisFields(txtDiagnosisId, txtAppointmentId, txtDescription);
                     }
                 } catch (SQLException ex) {
                     logArea.appendText("✗ Error: " + ex.getMessage() + "\n");
@@ -153,10 +216,41 @@ public class DiagnosisGUI {
                     ps.executeUpdate();
                     logArea.appendText("✓ Treatment plan added!\n");
                     refreshTreatmentTable();
-                    txtTreatDiagnosisId.clear();
-                    txtMedicationId.clear();
-                    txtDosage.clear();
-                    txtDuration.clear();
+                    clearFields(txtTreatDiagnosisId, txtMedicationId, txtDosage, txtDuration);
+                    treatmentTable.getSelectionModel().clearSelection();
+                }
+            } catch (SQLException ex) {
+                logArea.appendText("✗ Error: " + ex.getMessage() + "\n");
+            } catch (Exception ex) {
+                logArea.appendText("✗ Invalid input\n");
+            }
+        });
+
+        btnUpdateTreatment.setOnAction(e -> {
+            try {
+                int diagId = Integer.parseInt(txtTreatDiagnosisId.getText());
+                int medId = Integer.parseInt(txtMedicationId.getText());
+                String dosage = txtDosage.getText();
+                int duration = Integer.parseInt(txtDuration.getText());
+
+                String sql = "UPDATE REQUIRES SET DOSAGE = ?, DURATION = ? WHERE DIAGNOSIS_ID = ? AND MEDICATION_ID = ?";
+                try (Connection con = DBConnection.getConnection();
+                     PreparedStatement ps = con.prepareStatement(sql)) {
+                    ps.setString(1, dosage);
+                    ps.setInt(2, duration);
+                    ps.setInt(3, diagId);
+                    ps.setInt(4, medId);
+
+                    int rows = ps.executeUpdate();
+
+                    if (rows > 0) {
+                        logArea.appendText("✓ Treatment plan updated!\n");
+                        refreshTreatmentTable();
+                        clearFields(txtTreatDiagnosisId, txtMedicationId, txtDosage, txtDuration);
+                        treatmentTable.getSelectionModel().clearSelection();
+                    } else {
+                        logArea.appendText("✗ No treatment plan found for Diagnosis " + diagId + " and Medication " + medId + "\n");
+                    }
                 }
             } catch (SQLException ex) {
                 logArea.appendText("✗ Error: " + ex.getMessage() + "\n");
@@ -178,6 +272,7 @@ public class DiagnosisGUI {
                         ps.executeUpdate();
                         logArea.appendText("✓ Treatment plan deleted!\n");
                         refreshTreatmentTable();
+                        clearFields(txtTreatDiagnosisId, txtMedicationId, txtDosage, txtDuration);
                     }
                 } catch (SQLException ex) {
                     logArea.appendText("✗ Error: " + ex.getMessage() + "\n");
@@ -187,8 +282,17 @@ public class DiagnosisGUI {
             }
         });
 
-        btnRefreshDiagnosis.setOnAction(e -> refreshDiagnosisTable());
-        btnRefreshTreatment.setOnAction(e -> refreshTreatmentTable());
+        btnRefreshDiagnosis.setOnAction(e -> {
+            refreshDiagnosisTable();
+            clearDiagnosisFields(txtDiagnosisId, txtAppointmentId, txtDescription);
+            diagnosisTable.getSelectionModel().clearSelection();
+        });
+
+        btnRefreshTreatment.setOnAction(e -> {
+            refreshTreatmentTable();
+            clearFields(txtTreatDiagnosisId, txtMedicationId, txtDosage, txtDuration);
+            treatmentTable.getSelectionModel().clearSelection();
+        });
 
         VBox mainLayout = new VBox(10);
         mainLayout.setPadding(new Insets(10));
@@ -273,5 +377,15 @@ public class DiagnosisGUI {
         } catch (SQLException e) {
             logArea.appendText("✗ DB Error: " + e.getMessage() + "\n");
         }
+    }
+
+    private void clearFields(TextField... fields) {
+        for (TextField f : fields) f.clear();
+    }
+
+    private void clearDiagnosisFields(TextField txtDiagnosisId, TextField txtAppointmentId, TextArea txtDescription) {
+        txtDiagnosisId.clear();
+        txtAppointmentId.clear();
+        txtDescription.clear();
     }
 }
