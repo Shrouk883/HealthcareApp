@@ -18,6 +18,7 @@ public class MedicationGUI {
 
         TextField txtId = new TextField();
         txtId.setPromptText("Medication ID");
+
         TextField txtName = new TextField();
         txtName.setPromptText("Medication Name");
 
@@ -36,11 +37,11 @@ public class MedicationGUI {
 
         setupTable();
 
-        // Load selected row into fields
-        tableView.getSelectionModel().selectedItemProperty().addListener((obs, old, selected) -> {
-            if (selected != null) {
-                txtId.setText(selected.get(0));
-                txtName.setText(selected.get(1));
+        // Autofill fields when selecting a row
+        tableView.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, selectedRow) -> {
+            if (selectedRow != null) {
+                txtId.setText(selectedRow.get(0));
+                txtName.setText(selectedRow.get(1));
             }
         });
 
@@ -50,17 +51,25 @@ public class MedicationGUI {
                 String name = txtName.getText();
 
                 String sql = "INSERT INTO MEDICATION (MEDICATION_ID, MEDICATION_NAME) VALUES (?, ?)";
+
                 try (Connection con = DBConnection.getConnection();
                      PreparedStatement ps = con.prepareStatement(sql)) {
+
                     ps.setInt(1, id);
                     ps.setString(2, name);
+
                     ps.executeUpdate();
+
                     logArea.appendText("✓ Medication " + id + " added!\n");
                     refreshTable();
                     clearFields(txtId, txtName);
+                    tableView.getSelectionModel().clearSelection();
                 }
+
             } catch (SQLException ex) {
                 logArea.appendText("✗ Error: " + ex.getMessage() + "\n");
+            } catch (Exception ex) {
+                logArea.appendText("✗ Invalid input\n");
             }
         });
 
@@ -70,52 +79,79 @@ public class MedicationGUI {
                 String name = txtName.getText();
 
                 String sql = "UPDATE MEDICATION SET MEDICATION_NAME = ? WHERE MEDICATION_ID = ?";
+
                 try (Connection con = DBConnection.getConnection();
                      PreparedStatement ps = con.prepareStatement(sql)) {
+
                     ps.setString(1, name);
                     ps.setInt(2, id);
-                    int updated = ps.executeUpdate();
-                    if (updated > 0) {
+
+                    int rows = ps.executeUpdate();
+
+                    if (rows > 0) {
                         logArea.appendText("✓ Medication " + id + " updated!\n");
                         refreshTable();
+                        clearFields(txtId, txtName);
+                        tableView.getSelectionModel().clearSelection();
                     } else {
-                        logArea.appendText("✗ Medication " + id + " not found\n");
+                        logArea.appendText("✗ No medication found with ID " + id + "\n");
                     }
                 }
+
             } catch (SQLException ex) {
                 logArea.appendText("✗ Error: " + ex.getMessage() + "\n");
+            } catch (Exception ex) {
+                logArea.appendText("✗ Invalid input\n");
             }
         });
 
         btnDelete.setOnAction(e -> {
             String selected = getSelectedId();
+
             if (selected != null) {
                 try {
                     String sql = "DELETE FROM MEDICATION WHERE MEDICATION_ID = ?";
+
                     try (Connection con = DBConnection.getConnection();
                          PreparedStatement ps = con.prepareStatement(sql)) {
+
                         ps.setInt(1, Integer.parseInt(selected));
-                        ps.executeUpdate();
-                        logArea.appendText("✓ Medication " + selected + " deleted!\n");
-                        refreshTable();
-                        clearFields(txtId, txtName);
+
+                        int rows = ps.executeUpdate();
+
+                        if (rows > 0) {
+                            logArea.appendText("✓ Medication " + selected + " deleted!\n");
+                            refreshTable();
+                            clearFields(txtId, txtName);
+                            tableView.getSelectionModel().clearSelection();
+                        } else {
+                            logArea.appendText("✗ No medication found with ID " + selected + "\n");
+                        }
                     }
+
                 } catch (SQLException ex) {
                     logArea.appendText("✗ Error: " + ex.getMessage() + "\n");
                 }
+
             } else {
                 logArea.appendText("✗ Please select a medication to delete\n");
             }
         });
 
-        btnRefresh.setOnAction(e -> refreshTable());
+        btnRefresh.setOnAction(e -> {
+            refreshTable();
+            clearFields(txtId, txtName);
+            tableView.getSelectionModel().clearSelection();
+        });
 
         GridPane inputGrid = new GridPane();
         inputGrid.setPadding(new Insets(10));
         inputGrid.setVgap(10);
         inputGrid.setHgap(10);
+
         inputGrid.add(new Label("Medication ID:"), 0, 0);
         inputGrid.add(txtId, 1, 0);
+
         inputGrid.add(new Label("Name:"), 0, 1);
         inputGrid.add(txtName, 1, 1);
 
@@ -125,9 +161,12 @@ public class MedicationGUI {
         mainLayout.setPadding(new Insets(10));
         mainLayout.getChildren().addAll(
                 new Label("MEDICATION MANAGEMENT"),
-                inputGrid, buttonBox,
-                new Label("Medication List (Click to select):"), tableView,
-                new Label("Log:"), logArea
+                inputGrid,
+                buttonBox,
+                new Label("Medication List (Click to select):"),
+                tableView,
+                new Label("Log:"),
+                logArea
         );
 
         Scene scene = new Scene(mainLayout, 700, 550);
@@ -153,6 +192,7 @@ public class MedicationGUI {
 
     private void refreshTable() {
         tableView.getItems().clear();
+
         String sql = "SELECT MEDICATION_ID, MEDICATION_NAME FROM MEDICATION ORDER BY MEDICATION_ID";
 
         try (Connection con = DBConnection.getConnection();
@@ -161,10 +201,13 @@ public class MedicationGUI {
 
             while (rs.next()) {
                 ObservableList<String> row = FXCollections.observableArrayList();
+
                 row.add(String.valueOf(rs.getInt("MEDICATION_ID")));
                 row.add(rs.getString("MEDICATION_NAME"));
+
                 tableView.getItems().add(row);
             }
+
             logArea.appendText("✓ Loaded " + tableView.getItems().size() + " medications\n");
 
         } catch (SQLException e) {
@@ -180,6 +223,8 @@ public class MedicationGUI {
     }
 
     private void clearFields(TextField... fields) {
-        for (TextField f : fields) f.clear();
+        for (TextField f : fields) {
+            f.clear();
+        }
     }
 }
