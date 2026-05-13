@@ -24,10 +24,12 @@ public class BranchGUI {
         txtContact.setPromptText("Contact Details");
 
         Button btnInsert = new Button("Add Branch");
+        Button btnUpdate = new Button("Update");
         Button btnDelete = new Button("Delete");
         Button btnRefresh = new Button("Refresh");
 
         btnInsert.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white;");
+        btnUpdate.setStyle("-fx-background-color: #f39c12; -fx-text-fill: white;");
         btnDelete.setStyle("-fx-background-color: #e74c3c; -fx-text-fill: white;");
         btnRefresh.setStyle("-fx-background-color: #3498db; -fx-text-fill: white;");
 
@@ -35,6 +37,14 @@ public class BranchGUI {
         logArea.setPrefHeight(150);
 
         setupTable();
+
+        tableView.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, selectedRow) -> {
+            if (selectedRow != null) {
+                txtId.setText(selectedRow.get(0));
+                txtAddress.setText(selectedRow.get(1));
+                txtContact.setText(selectedRow.get(2));
+            }
+        });
 
         btnInsert.setOnAction(e -> {
             try {
@@ -60,6 +70,36 @@ public class BranchGUI {
             }
         });
 
+        btnUpdate.setOnAction(e -> {
+            try {
+                int id = Integer.parseInt(txtId.getText());
+                String address = txtAddress.getText();
+                String contact = txtContact.getText();
+
+                String sql = "UPDATE BRANCH SET _ADDRESS = ?, CONTACT_DETAILS = ? WHERE BRANCH_ID_ = ?";
+                try (Connection con = DBConnection.getConnection();
+                     PreparedStatement ps = con.prepareStatement(sql)) {
+                    ps.setString(1, address);
+                    ps.setString(2, contact);
+                    ps.setInt(3, id);
+
+                    int rows = ps.executeUpdate();
+
+                    if (rows > 0) {
+                        logArea.appendText("✓ Branch " + id + " updated!\n");
+                        refreshTable();
+                        clearFields(txtId, txtAddress, txtContact);
+                    } else {
+                        logArea.appendText("✗ No branch found with ID " + id + "\n");
+                    }
+                }
+            } catch (SQLException ex) {
+                logArea.appendText("✗ Error: " + ex.getMessage() + "\n");
+            } catch (Exception ex) {
+                logArea.appendText("✗ Invalid input\n");
+            }
+        });
+
         btnDelete.setOnAction(e -> {
             String selected = getSelectedId();
             if (selected != null) {
@@ -78,7 +118,11 @@ public class BranchGUI {
             }
         });
 
-        btnRefresh.setOnAction(e -> refreshTable());
+        btnRefresh.setOnAction(e -> {
+            refreshTable();
+            clearFields(txtId, txtAddress, txtContact);
+            tableView.getSelectionModel().clearSelection();
+        });
 
         GridPane inputGrid = new GridPane();
         inputGrid.setPadding(new Insets(10));
@@ -91,7 +135,7 @@ public class BranchGUI {
         inputGrid.add(new Label("Contact:"), 0, 2);
         inputGrid.add(txtContact, 1, 2);
 
-        HBox buttonBox = new HBox(10, btnInsert, btnDelete, btnRefresh);
+        HBox buttonBox = new HBox(10, btnInsert, btnUpdate, btnDelete, btnRefresh);
 
         VBox mainLayout = new VBox(10);
         mainLayout.setPadding(new Insets(10));
