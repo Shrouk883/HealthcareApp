@@ -40,6 +40,15 @@ public class PatientGUI {
 
         setupTable();
 
+        tableView.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, selectedRow) -> {
+            if (selectedRow != null) {
+                txtId.setText(selectedRow.get(0));
+                txtName.setText(selectedRow.get(1));
+                txtDemographics.setText(selectedRow.get(2));
+                txtHistory.setText(selectedRow.get(3));
+            }
+        });
+
         btnInsert.setOnAction(e -> {
             try {
                 int id = Integer.parseInt(txtId.getText());
@@ -66,6 +75,41 @@ public class PatientGUI {
             }
         });
 
+        btnUpdate.setOnAction(e -> {
+            try {
+                int id = Integer.parseInt(txtId.getText());
+                String name = txtName.getText();
+                String demographics = txtDemographics.getText();
+                String history = txtHistory.getText();
+
+                String sql = "UPDATE PATIENT SET NAME = ?, DEMOGRAPHICS = ?, HISTORY = ? WHERE PATIENT_ID_ = ?";
+
+                try (Connection con = DBConnection.getConnection();
+                     PreparedStatement ps = con.prepareStatement(sql)) {
+
+                    ps.setString(1, name);
+                    ps.setString(2, demographics);
+                    ps.setString(3, history);
+                    ps.setInt(4, id);
+
+                    int rows = ps.executeUpdate();
+
+                    if (rows > 0) {
+                        logArea.appendText("✓ Patient " + id + " updated!\n");
+                        refreshTable();
+                        clearFields(txtId, txtName, txtDemographics, txtHistory);
+                    } else {
+                        logArea.appendText("✗ No patient found with ID " + id + "\n");
+                    }
+                }
+
+            } catch (SQLException ex) {
+                logArea.appendText("✗ Error: " + ex.getMessage() + "\n");
+            } catch (Exception ex) {
+                logArea.appendText("✗ Invalid input\n");
+            }
+        });
+
         btnDelete.setOnAction(e -> {
             String selected = getSelectedId();
             if (selected != null) {
@@ -84,7 +128,11 @@ public class PatientGUI {
             }
         });
 
-        btnRefresh.setOnAction(e -> refreshTable());
+        btnRefresh.setOnAction(e -> {
+            refreshTable();
+            clearFields(txtId, txtName, txtDemographics, txtHistory);
+            tableView.getSelectionModel().clearSelection();
+        });
 
         GridPane inputGrid = new GridPane();
         inputGrid.setPadding(new Insets(10));
