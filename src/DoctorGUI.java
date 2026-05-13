@@ -40,6 +40,15 @@ public class DoctorGUI {
 
         setupTable();
 
+        tableView.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, selectedRow) -> {
+            if (selectedRow != null) {
+                txtId.setText(selectedRow.get(0));
+                txtBranchId.setText(selectedRow.get(1));
+                txtName.setText(selectedRow.get(2));
+                txtExpertise.setText(selectedRow.get(3));
+            }
+        });
+
         btnInsert.setOnAction(e -> {
             try {
                 int id = Integer.parseInt(txtId.getText());
@@ -66,6 +75,38 @@ public class DoctorGUI {
             }
         });
 
+        btnUpdate.setOnAction(e -> {
+            try {
+                int id = Integer.parseInt(txtId.getText());
+                int branchId = Integer.parseInt(txtBranchId.getText());
+                String name = txtName.getText();
+                String expertise = txtExpertise.getText();
+
+                String sql = "UPDATE DOCTOR SET BRANCH_ID_ = ?, NAME = ?, EXPERTISE = ? WHERE DOCTOR_ID = ?";
+                try (Connection con = DBConnection.getConnection();
+                     PreparedStatement ps = con.prepareStatement(sql)) {
+                    ps.setInt(1, branchId);
+                    ps.setString(2, name);
+                    ps.setString(3, expertise);
+                    ps.setInt(4, id);
+
+                    int rows = ps.executeUpdate();
+
+                    if (rows > 0) {
+                        logArea.appendText("✓ Doctor " + id + " updated!\n");
+                        refreshTable();
+                        clearFields(txtId, txtBranchId, txtName, txtExpertise);
+                    } else {
+                        logArea.appendText("✗ No doctor found with ID " + id + "\n");
+                    }
+                }
+            } catch (SQLException ex) {
+                logArea.appendText("✗ Error: " + ex.getMessage() + "\n");
+            } catch (Exception ex) {
+                logArea.appendText("✗ Invalid input\n");
+            }
+        });
+
         btnDelete.setOnAction(e -> {
             String selected = getSelectedId();
             if (selected != null) {
@@ -84,7 +125,11 @@ public class DoctorGUI {
             }
         });
 
-        btnRefresh.setOnAction(e -> refreshTable());
+        btnRefresh.setOnAction(e -> {
+            refreshTable();
+            clearFields(txtId, txtBranchId, txtName, txtExpertise);
+            tableView.getSelectionModel().clearSelection();
+        });
 
         GridPane inputGrid = new GridPane();
         inputGrid.setPadding(new Insets(10));
